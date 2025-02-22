@@ -133,7 +133,6 @@ class CodeExecutionSandboxConfig(BaseSettings):
         default=1000,
     )
 
-
 class EndpointConfig(BaseSettings):
     """
     Configuration for various application endpoints and URLs
@@ -782,6 +781,37 @@ class AccountConfig(BaseSettings):
     )
 
 
+# EDC hick start
+class EdcConfig(BaseSettings):
+    """
+    Configuration for edc
+    """
+
+    EDC_SECRET: str = Field(
+        description="Secret for edc",
+        default="GkG|Q5dXo70c6+BV!rzh",
+    )
+
+    EDC_SECRET_HEADER_NAME: str = Field(
+        description="Secret header name for edc",
+        default="x-trusted-secret",
+    )
+
+    EDC_TRUSTED_USER_ID_HEADER_NAME: str = Field(
+        description="Secret header name for user id",
+        default="x-trusted-user-id",
+    )
+    EDC_TRUSTED_USER_NAME_HEADER_NAME: str = Field(
+        description="Secret header name for user name",
+        default="x-trusted-user-name",
+    )
+
+    EDC_ADMIN_EMAIL: str = Field(
+        description="email of admin which is the owner of edc workspace",
+        default="admin@whlyy-edc.com",
+    )
+# edc heck end
+
 class FeatureConfig(
     # place the configs in alphabet order
     AppExecutionConfig,
@@ -790,6 +820,7 @@ class FeatureConfig(
     CodeExecutionSandboxConfig,
     DataSetConfig,
     EndpointConfig,
+    EdcConfig,
     FileAccessConfig,
     FileUploadConfig,
     HttpConfig,

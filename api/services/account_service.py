@@ -128,6 +128,27 @@ class AccountService:
         return cast(Account, account)
 
     @staticmethod
+    def load_user_by_email(email: str) -> None | Account:
+        import click
+        click.echo(f"load_user_by_email: {email}")
+        account = db.session.query(Account).filter_by(email=email).first()
+        if not account:
+            return None
+
+        if account.status == AccountStatus.BANNED.value:
+            raise Unauthorized("Account is banned.")
+
+        current_tenant = TenantAccountJoin.query.filter_by(account_id=account.id, current=True).first()
+        if current_tenant:
+            account.current_tenant_id = current_tenant.tenant_id
+
+        if datetime.now(UTC).replace(tzinfo=None) - account.last_active_at > timedelta(minutes=10):
+            account.last_active_at = datetime.now(UTC).replace(tzinfo=None)
+            db.session.commit()
+
+        return cast(Account, account)
+
+    @staticmethod
     def get_account_jwt_token(account: Account) -> str:
         exp_dt = datetime.now(UTC) + timedelta(minutes=dify_config.ACCESS_TOKEN_EXPIRE_MINUTES)
         exp = int(exp_dt.timestamp())
@@ -847,6 +868,58 @@ class RegisterService:
             raise ValueError(f"Setup failed: {e}")
 
     @classmethod
+    def sighup(
+            cls,
+            email,
+            name,
+            password: Optional[str] = None
+    ) :
+        db.session.begin_nested()
+        """Register account"""
+        try:
+            account = AccountService.create_account(
+                email=email,
+                name=name,
+                interface_language="zh-Hans",
+                password=password,
+                is_setup=True, # make sure ignore system settings
+            )
+            account.status = AccountStatus.ACTIVE.value
+            account.initialized_at = datetime.now(UTC).replace(tzinfo=None)
+
+            admin = AccountService.load_user_by_email(email=dify_config.EDC_ADMIN_EMAIL)
+            if not admin:
+                return None
+
+            import click
+            click.echo(f"Step 10: get admin account: {dify_config.EDC_ADMIN_EMAIL}")
+            tenant = TenantService.get_join_tenants(admin)
+            if not tenant:
+                return None
+            tenant = tenant[0]
+            click.echo(f"Step 11: get admin tenant: {tenant.id}")
+            from models import TenantAccountJoinRole
+
+            ta = TenantAccountJoin(tenant_id=tenant.id, account_id=account.id, role=TenantAccountJoinRole.NORMAL.value)
+            db.session.add(ta)
+
+            click.echo(f"Step 12: add {email} to admin tenant: {tenant.id}")
+
+            db.session.commit()
+        except WorkSpaceNotAllowedCreateError:
+            db.session.rollback()
+        except AccountRegisterError as are:
+            db.session.rollback()
+            logging.exception("Sighup failed")
+            raise are
+        except Exception as e:
+            db.session.rollback()
+            logging.exception("Sighup failed")
+            raise AccountRegisterError(f"Sighup failed: {e}") from e
+
+        return account
+
+    @classmethod
     def register(
         cls,
         email,
@@ -871,6 +944,9 @@ class RegisterService:
             )
             account.status = AccountStatus.ACTIVE.value if not status else status.value
             account.initialized_at = datetime.now(UTC).replace(tzinfo=None)
+
+            if is_setup:
+                tenant = TenantService.get_current_tenant_by_account()
 
             if open_id is not None and provider is not None:
                 AccountService.link_account_integrate(provider, open_id, account)

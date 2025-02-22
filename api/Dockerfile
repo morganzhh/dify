@@ -9,6 +9,21 @@ ENV POETRY_VERSION=2.0.1
 # if you located in China, you can use aliyun mirror to speed up
 # RUN pip install --no-cache-dir poetry==${POETRY_VERSION} -i https://mirrors.aliyun.com/pypi/simple/
 
+
+RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+RUN pip config set global.trusted-host pypi.tuna.tsinghua.edu.cn
+
+
+#新版本慢#https://mirrors.aliyun.com/pytorch-wheels/cu121/
+#最新#https://mirror.sjtu.edu.cn/pytorch-wheels/cu121/
+
+#pip install torch===1.4.0 torchvision===0.5.0 -f https://download.pytorch.org/whl/torch_stable.html
+## replace to
+#pip install torch===1.4.0 torchvision===0.5.0 -f https://s3.amazonaws.com/pytorch/whl/torch_stable.html
+
+
+
+
 RUN pip install --no-cache-dir poetry==${POETRY_VERSION}
 
 # Configure Poetry
@@ -19,9 +34,11 @@ ENV POETRY_VIRTUALENVS_CREATE=true
 ENV POETRY_REQUESTS_TIMEOUT=15
 
 FROM base AS packages
+RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+RUN pip config set global.trusted-host pypi.tuna.tsinghua.edu.cn
 
 # if you located in China, you can use aliyun mirror to speed up
-# RUN sed -i 's@deb.debian.org@mirrors.aliyun.com@g' /etc/apt/sources.list.d/debian.sources
+RUN sed -i 's@deb.debian.org@mirrors.aliyun.com@g' /etc/apt/sources.list.d/debian.sources
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends gcc g++ libc-dev libffi-dev libgmp-dev libmpfr-dev libmpc-dev
